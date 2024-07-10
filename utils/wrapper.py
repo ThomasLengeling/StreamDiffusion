@@ -12,11 +12,12 @@ from PIL import Image
 from streamdiffusion import StreamDiffusion
 from streamdiffusion.image_utils import postprocess_image
 
-
 torch.set_grad_enabled(False)
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
 
+module_path = os.path.abspath(__file__)
+touchdiffusion_path = os.path.abspath(os.path.join(module_path, "../../../"))
 
 class StreamDiffusionWrapper:
     def __init__(
@@ -26,7 +27,7 @@ class StreamDiffusionWrapper:
         lora_dict: Optional[Dict[str, float]] = None,
         controlnet_dicts: Optional[List[Dict[str, float]]] = None,
         mode: Literal["img2img", "txt2img"] = "img2img",
-        output_type: Literal["pil", "pt", "np", "latent"] = "pil",
+        output_type: Literal["pil", "pt", "np", "latent"] = "pt",
         lcm_lora_id: Optional[str] = None,
         HyperSD_lora_id: Optional[str] = None,
         vae_id: Optional[str] = None,
@@ -38,7 +39,12 @@ class StreamDiffusionWrapper:
         acceleration: Literal["none", "xformers", "tensorrt"] = "tensorrt",
         do_add_noise: bool = True,
         device_ids: Optional[List[int]] = None,
+<<<<<<< HEAD
         CM_lora_type: Literal["lcm", "Hyper_SD", "none"] = "Hyper_SD",
+=======
+        use_lcm_lora: bool = False,
+        use_hyper_lora: bool = False,
+>>>>>>> upstream/main
         use_tiny_vae: bool = True,
         enable_similar_image_filter: bool = False,
         similar_image_filter_threshold: float = 0.98,
@@ -47,7 +53,9 @@ class StreamDiffusionWrapper:
         cfg_type: Literal["none", "full", "self", "initialize"] = "self",
         seed: int = 2,
         use_safety_checker: bool = False,
-        engine_dir: Optional[Union[str, Path]] = "engines",
+        engine_dir: Optional[Union[str, Path]] = os.path.join(touchdiffusion_path, "engines"),
+        touchdiffusion: bool = False,
+        model_type: str = 'None'
     ):
         """
         Initializes the StreamDiffusionWrapper.
@@ -128,7 +136,8 @@ class StreamDiffusionWrapper:
         use_safety_checker : bool, optional
             Whether to use safety checker or not, by default False.
         """
-        self.sd_turbo = "turbo" in model_id_or_path
+        #self.sd_turbo = "turbo" in model_id_or_path
+        self.sd_turbo = False
 
         if mode == "txt2img":
             if cfg_type != "none":
@@ -153,7 +162,16 @@ class StreamDiffusionWrapper:
         self.use_denoising_batch = use_denoising_batch
         self.use_safety_checker = use_safety_checker
 
+<<<<<<< HEAD
         self.is_controlnet_enabled = controlnet_dicts is not None
+=======
+        if touchdiffusion == True:
+            self.local_files_only = True
+        else:
+            self.local_files_only = False
+        
+        self.model_type = model_type
+>>>>>>> upstream/main
 
         self.stream: StreamDiffusion = self._load_model(
             model_id_or_path=model_id_or_path,
@@ -165,11 +183,17 @@ class StreamDiffusionWrapper:
             t_index_list=t_index_list,
             acceleration=acceleration,
             do_add_noise=do_add_noise,
+<<<<<<< HEAD
             CM_lora_type=CM_lora_type,
+=======
+            use_lcm_lora=use_lcm_lora,
+            use_hyper_lora=use_hyper_lora,
+>>>>>>> upstream/main
             use_tiny_vae=use_tiny_vae,
             cfg_type=cfg_type,
             seed=seed,
             engine_dir=engine_dir,
+            touchdiffusion=touchdiffusion,
         )
 
         if device_ids is not None:
@@ -180,6 +204,26 @@ class StreamDiffusionWrapper:
                 similar_image_filter_threshold, similar_image_filter_max_skip_frame
             )
 
+
+    def touchdiffusion_prompt(self, prompt):
+        self.stream.update_prompt(prompt)
+        #self.stream.update_prompt_weight(prompt)
+
+    def touchdiffusion_scheduler(self, t_index_list):
+        self.stream.update_scheduler(t_index_list=t_index_list)
+    
+    def touchdiffusion_generate_t_index_list(self, noise_strength, mode):
+        t_index_list = self.stream.generate_t_index_list(noise_strength=noise_strength, mode=mode)
+        self.stream.update_scheduler(t_index_list=t_index_list)
+    
+    def touchdiffusion_update_cfg_setting(self,guidance_scale, delta):
+        self.stream.update_cfg_setting(guidance_scale=guidance_scale, delta=delta)
+        #self.stream.update_noise()
+
+    def touchdiffusion_update_noise(self, seed):
+        self.stream.init_generator(seed)
+        self.stream.update_noise()
+
     def prepare(
         self,
         prompt: str,
@@ -187,6 +231,8 @@ class StreamDiffusionWrapper:
         num_inference_steps: int = 50,
         guidance_scale: float = 1.2,
         delta: float = 1.0,
+        t_index_list: List[int] = 1
+        
     ) -> None:
         """
         Prepares the model for inference.
@@ -209,6 +255,7 @@ class StreamDiffusionWrapper:
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
             delta=delta,
+            t_index_list=t_index_list
         )
 
     def __call__(
@@ -280,6 +327,7 @@ class StreamDiffusionWrapper:
             image_tensor = self.stream.txt2img(self.frame_buffer_size, controlnet_images)
         image = self.postprocess_image(image_tensor, output_type=self.output_type)
 
+<<<<<<< HEAD
         if self.use_safety_checker:
             safety_checker_input = self.feature_extractor(image, return_tensors="pt").to(self.device)
             _, has_nsfw_concept = self.safety_checker(
@@ -287,6 +335,17 @@ class StreamDiffusionWrapper:
                 clip_input=safety_checker_input.pixel_values.to(self.dtype),
             )
             image = self.nsfw_fallback_img if has_nsfw_concept[0] else image
+=======
+        # if self.use_safety_checker:
+        #     safety_checker_input = self.feature_extractor(
+        #         image, return_tensors="pt"
+        #     ).to(self.device)
+        #     _, has_nsfw_concept = self.safety_checker(
+        #         images=image_tensor.to(self.dtype),
+        #         clip_input=safety_checker_input.pixel_values.to(self.dtype),
+        #     )
+        #     image = self.nsfw_fallback_img if has_nsfw_concept[0] else image
+>>>>>>> upstream/main
 
         return image
 
@@ -329,6 +388,7 @@ class StreamDiffusionWrapper:
         image_tensor = self.stream(image, controlnet_images=controlnet_images)
         image = self.postprocess_image(image_tensor, output_type=self.output_type)
 
+<<<<<<< HEAD
         if self.use_safety_checker:
             safety_checker_input = self.feature_extractor(image, return_tensors="pt").to(self.device)
             _, has_nsfw_concept = self.safety_checker(
@@ -337,6 +397,8 @@ class StreamDiffusionWrapper:
             )
             image = self.nsfw_fallback_img if has_nsfw_concept[0] else image
 
+=======
+>>>>>>> upstream/main
         return image
 
     def preprocess_image(self, image: Union[str, Image.Image], is_controlnet_image: bool = False) -> torch.Tensor:
@@ -355,6 +417,7 @@ class StreamDiffusionWrapper:
         torch.Tensor
             The preprocessed image.
         """
+<<<<<<< HEAD
         if isinstance(image, str):
             image = Image.open(image).convert("RGB").resize((self.width, self.height))
         if isinstance(image, Image.Image):
@@ -369,9 +432,24 @@ class StreamDiffusionWrapper:
                 device=self.device, dtype=self.dtype
             )
         )
+=======
+        if isinstance(image, torch.Tensor):
+            return self.stream.image_processor.preprocess(
+                image, self.height, self.width
+                ).to(device=self.device, dtype=self.dtype)
+        else:
+            if isinstance(image, str):
+                image = Image.open(image).convert("RGB").resize((self.width, self.height))
+            if isinstance(image, Image.Image):
+                image = image.convert("RGB").resize((self.width, self.height))
+            
+            return self.stream.image_processor.preprocess(
+                image, self.height, self.width
+            ).to(device=self.device, dtype=self.dtype)
+>>>>>>> upstream/main
 
     def postprocess_image(
-        self, image_tensor: torch.Tensor, output_type: str = "pil"
+        self, image_tensor: torch.Tensor, output_type: str = "pt"
     ) -> Union[Image.Image, List[Image.Image], torch.Tensor, np.ndarray]:
         """
         Postprocesses the image.
@@ -387,9 +465,9 @@ class StreamDiffusionWrapper:
             The postprocessed image.
         """
         if self.frame_buffer_size > 1:
-            return postprocess_image(image_tensor.cpu(), output_type=output_type)
+            return postprocess_image(image_tensor, output_type=output_type)
         else:
-            return postprocess_image(image_tensor.cpu(), output_type=output_type)[0]
+            return postprocess_image(image_tensor, output_type=output_type)[0]
 
     def _load_model(
         self,
@@ -402,11 +480,17 @@ class StreamDiffusionWrapper:
         vae_id: Optional[str] = None,
         acceleration: Literal["none", "xformers", "tensorrt"] = "tensorrt",
         do_add_noise: bool = True,
+<<<<<<< HEAD
         CM_lora_type: Literal["lcm", "Hyper_SD", "none"] = "lcm",
+=======
+        use_lcm_lora: bool = False,
+        use_hyper_lora: bool = False,
+>>>>>>> upstream/main
         use_tiny_vae: bool = True,
         cfg_type: Literal["none", "full", "self", "initialize"] = "self",
         seed: int = 2,
         engine_dir: Optional[Union[str, Path]] = "engines",
+        touchdiffusion: bool = False,
     ) -> StreamDiffusion:
         """
         Loads the model.
@@ -459,20 +543,35 @@ class StreamDiffusionWrapper:
         StreamDiffusion
             The loaded model.
         """
-
-        try:  # Load from local directory
-            pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_pretrained(
-                model_id_or_path,
-            ).to(device=self.device, dtype=self.dtype)
-
-        except ValueError:  # Load from huggingface
-            pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_single_file(
-                model_id_or_path,
-            ).to(device=self.device, dtype=self.dtype)
-        except Exception:  # No model found
-            traceback.print_exc()
+        # ['sd_1.5', 'sd_1.5_turbo']
+        try:
+            if self.model_type == 'sd_1.5':
+                pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_single_file(
+                        os.path.join(touchdiffusion_path, 'models/checkpoints', f'{model_id_or_path}.safetensors'),
+                        cache_dir = os.path.join(touchdiffusion_path, 'models/checkpoints'), 
+                        use_safetensors=True,
+                        local_files_only=self.local_files_only,
+                        torch_dtype = torch.float16,
+                        variant="fp16",
+                        add_watermarker=False,
+                        safety_checker=None
+                    ).to(device=self.device, dtype=self.dtype)
+            elif self.model_type == 'sd_1.5_turbo':
+                pipe: StableDiffusionPipeline = StableDiffusionPipeline.from_pretrained(
+                    "stabilityai/sd-turbo",
+                    #os.path.join(touchdiffusion_path, 'models/checkpoints', "stabilityai/sd-turbo"),
+                    cache_dir = os.path.join(touchdiffusion_path, 'models/checkpoints'), 
+                    use_safetensors=True,
+                    local_files_only=self.local_files_only,
+                    torch_dtype = torch.float16,
+                    variant="fp16",
+                    add_watermarker=False,
+                    safety_checker=None
+                ).to(device=self.device, dtype=self.dtype)
+        except Exception as e:  # No model found
+            #traceback.print_exc()
             print("Model load has failed. Doesn't exist.")
-            exit()
+            print(e)
 
         stream = StreamDiffusion(
             pipe=pipe,
@@ -489,11 +588,31 @@ class StreamDiffusionWrapper:
             if CM_lora_type == "lcm":
                 print("-----------------Using lcm-----------------")
                 if lcm_lora_id is not None:
+<<<<<<< HEAD
                     stream.load_lcm_lora(pretrained_model_name_or_path_or_dict=lcm_lora_id)
+=======
+                    stream.load_lcm_lora(
+                        pretrained_model_name_or_path_or_dict=lcm_lora_id, 
+                        cache_dir=os.path.join(touchdiffusion_path, 'models/acceleration_loras'),
+                        local_files_only=self.local_files_only
+                    )
+>>>>>>> upstream/main
                 else:
-                    stream.load_lcm_lora()
+                    stream.load_lcm_lora(
+                        pretrained_model_name_or_path_or_dict='latent-consistency/lcm-lora-sdv1-5',
+                        cache_dir=os.path.join(touchdiffusion_path, 'models/acceleration_loras'),
+                        local_files_only=self.local_files_only
+                    )
                 stream.fuse_lora()
+            elif use_hyper_lora:
+                stream.load_HyperSD_lora(
+                    cache_dir=os.path.join(touchdiffusion_path, 'models/acceleration_loras'),
+                    local_files_only=self.local_files_only
+                )
+            else:
+                pass
 
+<<<<<<< HEAD
             elif CM_lora_type == "Hyper_SD":
                 print(f"-----------------Using Hyper_SD {HyperSD_lora_id}-----------------")
                 if HyperSD_lora_id is not None:
@@ -517,6 +636,9 @@ class StreamDiffusionWrapper:
                 pass
 
             if lora_dict is not None:
+=======
+            if isinstance(lora_dict, dict):
+>>>>>>> upstream/main
                 for lora_name, lora_scale in lora_dict.items():
                     stream.load_lora(lora_name)
                     stream.fuse_lora(lora_scale=lora_scale)
@@ -530,10 +652,13 @@ class StreamDiffusionWrapper:
             if vae_id is not None:
                 stream.vae = AutoencoderTiny.from_pretrained(vae_id).to(device=pipe.device, dtype=pipe.dtype)
             else:
-                stream.vae = AutoencoderTiny.from_pretrained("madebyollin/taesd").to(
+                stream.vae = AutoencoderTiny.from_pretrained("madebyollin/taesd",
+                                                             cache_dir = os.path.join(touchdiffusion_path, 'models/vae'),
+                                                             local_files_only=self.local_files_only).to(
                     device=pipe.device, dtype=pipe.dtype
                 )
 
+<<<<<<< HEAD
         try:
             if acceleration == "xformers":
                 stream.pipe.enable_xformers_memory_efficient_attention()
@@ -598,9 +723,86 @@ class StreamDiffusionWrapper:
                     ),
                     "vae_decoder.engine",
                 )
+=======
+        if acceleration == "tensorrt":
+            from polygraphy import cuda
+            from streamdiffusion.acceleration.tensorrt import (
+                TorchVAEEncoder,
+                compile_unet,
+                compile_vae_decoder,
+                compile_vae_encoder,
+            )
+            from streamdiffusion.acceleration.tensorrt.engine import (
+                AutoencoderKLEngine,
+                UNet2DConditionModelEngine,
+            )
+            from streamdiffusion.acceleration.tensorrt.models import (
+                VAE,
+                UNet,
+                VAEEncoder,
+            )
 
+            def create_prefix(
+                model_id_or_path: str,
+                max_batch_size: int,
+                min_batch_size: int,
+            ):
+                
+                if use_lcm_lora == True:
+                    acceleration_mode = 'LCM'
+                elif use_hyper_lora == True:
+                    acceleration_mode = 'HyperSD'
+                else:
+                    acceleration_mode = 'None'
+
+                maybe_path = Path(os.path.join(touchdiffusion_path, model_id_or_path))
+                if maybe_path.exists():
+                    return f"{maybe_path.stem}--{self.model_type}--{self.width}--{self.height}--{acceleration_mode}--{max_batch_size}--{min_batch_size}--{self.mode}--None--None"
+                else:
+                    return f"{model_id_or_path}--{self.model_type}--{self.width}--{self.height}--{acceleration_mode}--{max_batch_size}--{min_batch_size}--{self.mode}--None--None"
+>>>>>>> upstream/main
+
+            engine_dir = Path(engine_dir)
+            unet_path = os.path.join(
+                engine_dir,
+                create_prefix(
+                    model_id_or_path=model_id_or_path,
+                    max_batch_size=stream.trt_unet_batch_size,
+                    min_batch_size=stream.trt_unet_batch_size,
+                ),
+                "unet.engine",
+            )
+            vae_encoder_path = os.path.join(
+                engine_dir,
+                create_prefix(
+                    model_id_or_path=model_id_or_path,
+                    max_batch_size=self.batch_size
+                    if self.mode == "txt2img"
+                    else stream.frame_bff_size,
+                    min_batch_size=self.batch_size
+                    if self.mode == "txt2img"
+                    else stream.frame_bff_size,
+                ),
+                "vae_encoder.engine",
+            )
+            vae_decoder_path = os.path.join(
+                engine_dir,
+                create_prefix(
+                    model_id_or_path=model_id_or_path,
+                    max_batch_size=self.batch_size
+                    if self.mode == "txt2img"
+                    else stream.frame_bff_size,
+                    min_batch_size=self.batch_size
+                    if self.mode == "txt2img"
+                    else stream.frame_bff_size,
+                ),
+                "vae_decoder.engine",
+            )
+
+            if touchdiffusion != True:
                 if not os.path.exists(unet_path):
                     os.makedirs(os.path.dirname(unet_path), exist_ok=True)
+<<<<<<< HEAD
                     if self.is_controlnet_enabled:
                         unet_model = UNetWithControlNet(
                             fp16=True,
@@ -636,6 +838,28 @@ class StreamDiffusionWrapper:
                             unet_path,
                             opt_batch_size=stream.trt_unet_batch_size,
                         )
+=======
+                    unet_model = UNet(
+                        fp16=True,
+                        device=stream.device,
+                        max_batch_size=stream.trt_unet_batch_size,
+                        min_batch_size=stream.trt_unet_batch_size,
+                        embedding_dim=stream.text_encoder.config.hidden_size,
+                        unet_dim=stream.unet.config.in_channels,
+                    )
+
+                    print(self.height)
+                    compile_unet(
+                        stream.unet,
+                        unet_model,
+                        unet_path + ".onnx",
+                        unet_path + ".opt.onnx",
+                        unet_path,
+                        self.height,
+                        self.width,
+                        opt_batch_size=stream.trt_unet_batch_size,
+                    )
+>>>>>>> upstream/main
 
                 if not os.path.exists(vae_decoder_path):
                     os.makedirs(os.path.dirname(vae_decoder_path), exist_ok=True)
@@ -651,7 +875,15 @@ class StreamDiffusionWrapper:
                         vae_decoder_path + ".onnx",
                         vae_decoder_path + ".opt.onnx",
                         vae_decoder_path,
+<<<<<<< HEAD
                         opt_batch_size=self.batch_size if self.mode == "txt2img" else stream.frame_bff_size,
+=======
+                        self.height,
+                        self.width,
+                        opt_batch_size=self.batch_size
+                        if self.mode == "txt2img"
+                        else stream.frame_bff_size,
+>>>>>>> upstream/main
                     )
                     delattr(stream.vae, "forward")
 
@@ -669,14 +901,23 @@ class StreamDiffusionWrapper:
                         vae_encoder_path + ".onnx",
                         vae_encoder_path + ".opt.onnx",
                         vae_encoder_path,
+<<<<<<< HEAD
                         opt_batch_size=self.batch_size if self.mode == "txt2img" else stream.frame_bff_size,
+=======
+                        self.height,
+                        self.width,
+                        opt_batch_size=self.batch_size
+                        if self.mode == "txt2img"
+                        else stream.frame_bff_size,
+>>>>>>> upstream/main
                     )
 
-                cuda_stream = cuda.Stream()
+            cuda_stream = cuda.Stream()
 
-                vae_config = stream.vae.config
-                vae_dtype = stream.vae.dtype
+            vae_config = stream.vae.config
+            vae_dtype = stream.vae.dtype
 
+<<<<<<< HEAD
 <<<<<<< HEAD
                 stream.unet = UNet2DConditionModelEngine(
                     unet_path, cuda_stream, use_cuda_graph=False
@@ -696,10 +937,25 @@ class StreamDiffusionWrapper:
                 )
                 setattr(stream.vae, "config", vae_config)
                 setattr(stream.vae, "dtype", vae_dtype)
+=======
+            stream.unet = UNet2DConditionModelEngine(
+                unet_path, cuda_stream, use_cuda_graph=False
+            )
+            stream.vae = AutoencoderKLEngine(
+                vae_encoder_path,
+                vae_decoder_path,
+                cuda_stream,
+                stream.pipe.vae_scale_factor,
+                use_cuda_graph=False,
+            )
+            setattr(stream.vae, "config", vae_config)
+            setattr(stream.vae, "dtype", vae_dtype)
+>>>>>>> upstream/main
 
-                gc.collect()
-                torch.cuda.empty_cache()
+            gc.collect()
+            torch.cuda.empty_cache()
 
+<<<<<<< HEAD
                 print("TensorRT acceleration enabled.")
             if acceleration == "sfast":
                 from streamdiffusion.acceleration.sfast import (
@@ -712,6 +968,9 @@ class StreamDiffusionWrapper:
             print(e)
             # traceback.print_exc()
             print("Acceleration has failed. Falling back to normal mode.")
+=======
+            print("TensorRT acceleration enabled.")
+>>>>>>> upstream/main
 
         if seed < 0:  # Random seed
             seed = np.random.randint(0, 1000000)
@@ -720,11 +979,19 @@ class StreamDiffusionWrapper:
             "",
             "",
             num_inference_steps=50,
+<<<<<<< HEAD
             guidance_scale=1.1 if stream.cfg_type in ["full", "self", "initialize"] else 1.0,
+=======
+            guidance_scale=1.1
+            if stream.cfg_type in ["full", "self", "initialize"]
+            else 1.0,
+            #generator=torch.manual_seed(seed),
+>>>>>>> upstream/main
             generator=torch.Generator(),
             seed=seed,
         )
 
+<<<<<<< HEAD
         if self.use_safety_checker:
             from diffusers.pipelines.stable_diffusion.safety_checker import (
                 StableDiffusionSafetyChecker,
@@ -737,4 +1004,6 @@ class StreamDiffusionWrapper:
             self.feature_extractor = CLIPFeatureExtractor.from_pretrained("openai/clip-vit-base-patch32")
             self.nsfw_fallback_img = Image.new("RGB", (512, 512), (0, 0, 0))
 
+=======
+>>>>>>> upstream/main
         return stream

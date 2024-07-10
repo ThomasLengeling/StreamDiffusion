@@ -30,6 +30,8 @@ def compile_vae_encoder(
     onnx_path: str,
     onnx_opt_path: str,
     engine_path: str,
+    opt_image_height: int,
+    opt_image_width: int,
     opt_batch_size: int = 1,
     engine_build_options: dict = {},
 ):
@@ -38,6 +40,8 @@ def compile_vae_encoder(
         onnx_path,
         onnx_opt_path,
         engine_path,
+        opt_image_height,
+        opt_image_width,
         opt_batch_size=opt_batch_size,
         **engine_build_options,
     )
@@ -49,6 +53,8 @@ def compile_vae_decoder(
     onnx_path: str,
     onnx_opt_path: str,
     engine_path: str,
+    opt_image_height: int,
+    opt_image_width: int,
     opt_batch_size: int = 1,
     engine_build_options: dict = {},
 ):
@@ -58,6 +64,8 @@ def compile_vae_decoder(
         onnx_path,
         onnx_opt_path,
         engine_path,
+        opt_image_height,
+        opt_image_width,
         opt_batch_size=opt_batch_size,
         **engine_build_options,
     )
@@ -69,6 +77,8 @@ def compile_unet(
     onnx_path: str,
     onnx_opt_path: str,
     engine_path: str,
+    opt_image_height: int,
+    opt_image_width: int,
     opt_batch_size: int = 1,
     engine_build_options: dict = {},
 ):
@@ -78,6 +88,8 @@ def compile_unet(
         onnx_path,
         onnx_opt_path,
         engine_path,
+        opt_image_height,
+        opt_image_width,
         opt_batch_size=opt_batch_size,
         **engine_build_options,
     )
